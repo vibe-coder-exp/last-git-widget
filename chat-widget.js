@@ -16,8 +16,9 @@
     }
 
     // Supabase configuration loaded from config.js (generated from .env)
-    const SUPABASE_URL = window.SUPABASE_CONFIG?.url || '';
-    const SUPABASE_ANON_KEY = window.SUPABASE_CONFIG?.anonKey || '';
+    // Supabase configuration - Hardcoded for simplicity
+    const SUPABASE_URL = 'https://uwuizytnrmjkwscagapj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3dWl6eXRucm1qa3dzY2FnYXBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNzg5OTksImV4cCI6MjA4MDc1NDk5OX0.siCpeFl3GGnXcrTfjmC10mjO0pNoj9L7e9zn4lCSCPY';
 
     // Prevent multiple initializations
     if (window.N8NChatWidgetInitialized) return;
@@ -191,15 +192,15 @@
     function formatMessage(text) {
         // 1. Escape HTML first
         let safeText = escapeHtml(text);
-        
+
         // 2. Convert URLs to links
         safeText = safeText.replace(/(https?:\/\/[^\s]+)/g, (url) => {
             return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`;
         });
-        
+
         // 3. Convert newlines
         safeText = safeText.replace(/\n/g, '<br>');
-        
+
         return safeText;
     }
 
