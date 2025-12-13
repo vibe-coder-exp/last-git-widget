@@ -35,7 +35,7 @@
 
         // Extract base path (e.g. https://my-app.vercel.app/deployment/)
         const scriptUrl = new URL(currentScript.src);
-        const basePath = scriptUrl.origin + scriptUrl.pathname.substring(0, scriptUrl.pathname.lastIndexOf('/') + 1);
+        const basePath = scriptUrl.href.substring(0, scriptUrl.href.lastIndexOf('/') + 1);
         const botId = scriptUrl.searchParams.get('botId');
 
         const widgetScript = document.createElement('script');
