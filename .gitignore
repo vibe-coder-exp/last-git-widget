@@ -1,7 +1,5 @@
 # Credentials
 .env
-config.js
-deployment/config.js
 
 # Dependencies
 node_modules/
