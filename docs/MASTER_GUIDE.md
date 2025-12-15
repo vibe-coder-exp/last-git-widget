@@ -126,13 +126,8 @@ Use this if you need more control or already use Supabase on your site.
 ```html
 <!-- 1. Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- 2. Config -->
-<script src="https://your-site.com/chat/config.js"></script>
-
-<!-- 3. Widget -->
-<script src="https://your-site.com/chat/chat-widget.js?botId=my-bot-01"></script>
-```
+<!-- 2. Widget (No Config Needed!) -->
+<script src="https://your-domain.com/chat-widget.js?botId=your-id"></script>
 
 ### ⚛️ WordPress / CMS
 1.  Go to **Appearance > Theme File Editor**.
