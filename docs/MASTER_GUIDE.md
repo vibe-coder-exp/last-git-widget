@@ -113,27 +113,22 @@ The widget is controlled by the `bot_configurations` table. Here is a visual map
 
 Copy-paste these blocks to add the widget to your platforms.
 
-### 🌐 Standard HTML Site (1-Line Embed)
-The easiest way to add the widget. It automatically loads all dependencies.
-
-```html
-<script src="https://your-site.com/chat/embed.js?botId=my-bot-01"></script>
-```
-
-### 🌐 Advanced Integration (3-Line Embed)
-Use this if you need more control or already use Supabase on your site.
+### 🌐 Standard HTML Site (2-Line Embed)
+The easiest way to add the widget.
 
 ```html
 <!-- 1. Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- 2. Widget (No Config Needed!) -->
-<script src="https://your-domain.com/chat-widget.js?botId=your-id"></script>
+
+<!-- 2. Chat Widget -->
+<script src="https://your-site.com/chat-widget.js?botId=my-bot-01"></script>
+```
 
 ### ⚛️ WordPress / CMS
 1.  Go to **Appearance > Theme File Editor**.
 2.  Open `footer.php`.
-3.  Paste the **1-Line Embed** code block just before the closing `</body>` tag.
-4.  Upload your `embed.js`, `chat-widget.js`, and `config.js` to your Media Library or Server.
+3.  Paste the **2-Line Embed** code block just before the closing `</body>` tag.
+4.  Upload your `chat-widget.js` to your Media Library or Server.
 
 ---
 
