@@ -1507,55 +1507,6 @@
         return false; // No history found
     }
 
-    // Start conversation (New or Resume)
-    async function startNewConversation(chatContainer, chatInterface, messagesContainer, resumeSessionId = null) {
-
-        let isResuming = false;
-
-        if (resumeSessionId) {
-            currentSessionId = resumeSessionId;
-            isResuming = true;
-        } else {
-            // Generate NEW session
-            currentSessionId = generateUUID();
-            // Save to LocalStorage
-            const storageKey = `n8n_chat_session_${config.branding.botId || getBotId()}`;
-            localStorage.setItem(storageKey, currentSessionId);
-        }
-
-        // Subscribe to Realtime Updates
-        subscribeToMessages(messagesContainer);
-
-        // Show chat interface
-        chatContainer.querySelector('.brand-header').style.display = 'none';
-        chatContainer.querySelector('.new-conversation').style.display = 'none';
-        chatInterface.classList.add('active');
-
-        // Check History if resuming
-        let historyLoaded = false;
-        if (isResuming) {
-            historyLoaded = await loadChatHistory(currentSessionId, messagesContainer);
-        }
-
-        // Only show welcome message if NOT resuming or if history was empty
-        if (!historyLoaded) {
-            const botMessageDiv = document.createElement('div');
-            botMessageDiv.className = 'chat-message bot';
-            messagesContainer.appendChild(botMessageDiv);
-
-            const welcomeMessage = config.branding.welcomeText || 'Hello! How can I help you today?';
-
-            await typeMessage(welcomeMessage, botMessageDiv);
-
-            // Save welcome message to DB so it appears in history next time
-            saveMessageToDB(welcomeMessage, 'bot', { is_welcome: true });
-        }
-
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-
-
-
     // Send message
     async function sendMessage(message, messagesContainer) {
         // Check message limit first
