@@ -1284,6 +1284,22 @@
                 startNewConversation(chatContainer, chatInterface, messagesContainer, null);
             }
         });
+
+        // Auto-Resume logic (Check local storage)
+        const savedSessionId = localStorage.getItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
+        if (savedSessionId && config.behavior.rememberConversation) {
+            // If session exists, assume authorized and start chat
+            startNewConversation(chatContainer, chatInterface, messagesContainer, savedSessionId);
+
+            // Open widget if configured
+            if (config.behavior.autoOpenOnLoad) {
+                setTimeout(() => chatContainer.classList.add('open'), 500);
+            }
+        } else if (config.behavior.autoOpenOnLoad) {
+            // No session, but auto open.
+            // Just open the widget (shows Welcome Screen by default)
+            setTimeout(() => chatContainer.classList.add('open'), 500);
+        }
     }
 
     async function handleFormSubmit(e) {
