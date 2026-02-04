@@ -904,6 +904,14 @@
                     max-width: calc(100% - 40px);
                 }
             }
+            
+            /* Welcome Screen Wrapper */
+            .n8n-chat-widget .welcome-screen-interface {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                width: 100%;
+            }
 
             /* Small mobile devices */
             @media (max-width: 480px) {
@@ -1046,25 +1054,27 @@
             ? `<img src="${config.branding.logo}" alt="${config.branding.name}">`
             : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-2.5l7.51-3.49L17.5 6.5 9.99 9.99 6.5 17.5zm5.5-6.6c.61 0 1.1.49 1.1 1.1s-.49 1.1-1.1 1.1-1.1-.49-1.1-1.1.49-1.1 1.1-1.1z"/></svg>`;
 
-        // New conversation screen
+        // New conversation screen (Welcome)
         const newConversationHTML = `
-            <div class="brand-header">
-                <div class="logo-container">${logoContent}</div>
-                <div class="brand-header-text">
-                    <span>${config.branding.name}</span>
-                    ${config.header.showStatus ? `<div class="brand-status">${config.header.statusText}</div>` : ''}
+            <div class="welcome-screen-interface">
+                <div class="brand-header">
+                    <div class="logo-container">${logoContent}</div>
+                    <div class="brand-header-text">
+                        <span>${config.branding.name}</span>
+                        ${config.header.showStatus ? `<div class="brand-status">${config.header.statusText}</div>` : ''}
+                    </div>
+                    <button class="close-button" aria-label="Close chat">×</button>
                 </div>
-                <button class="close-button" aria-label="Close chat">×</button>
-            </div>
-            <div class="new-conversation">
-                <h2 class="welcome-text">${config.branding.welcomeText}</h2>
-                <p class="response-text">${config.branding.responseTimeText}</p>
-                <button class="new-chat-btn">
-                    <svg class="message-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-                    </svg>
-                    ${config.branding.startButtonText}
-                </button>
+                <div class="new-conversation">
+                    <h2 class="welcome-text">${config.branding.welcomeText}</h2>
+                    <p class="response-text">${config.branding.responseTimeText}</p>
+                    <button class="new-chat-btn">
+                        <svg class="message-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                        </svg>
+                        ${config.branding.startButtonText}
+                    </button>
+                </div>
             </div>
         `;
 
@@ -1185,7 +1195,7 @@
         // Form Handling Helpers
         function checkLeadRequired() {
             if (!config.leadCollection?.enabled) return false;
-            
+
             // Check if we already have this user's details saved locally
             const savedLead = localStorage.getItem(`n8n_chat_lead_${config.branding.botId || getBotId()}`);
             return !savedLead;
@@ -1196,7 +1206,7 @@
             fieldsContainer.innerHTML = '';
 
             const fields = config.leadCollection.fields || [];
-            
+
             // Default fields if none configured but enabled
             if (fields.length === 0) {
                 fields.push({ name: 'name', label: 'Name', type: 'text', required: true });
@@ -1206,7 +1216,7 @@
             fields.forEach(field => {
                 const group = document.createElement('div');
                 group.className = 'form-group';
-                
+
                 const label = document.createElement('label');
                 label.className = 'form-label';
                 label.textContent = field.label;
@@ -1224,121 +1234,21 @@
             });
         }
 
+        // Show Chat Interface Helpers
+        function showWelcomeScreen() {
+            chatContainer.querySelector('.welcome-screen-interface').style.display = 'flex';
+            chatContainer.querySelector('.lead-form-interface').classList.remove('active');
+            chatContainer.querySelector('.chat-interface').classList.remove('active');
+        }
+
         function showLeadForm() {
             renderLeadForm();
-            chatContainer.querySelector('.new-conversation').style.display = 'none';
+            chatContainer.querySelector('.welcome-screen-interface').style.display = 'none';
             chatContainer.querySelector('.chat-interface').classList.remove('active');
             chatContainer.querySelector('.lead-form-interface').classList.add('active');
         }
 
-        async function handleFormSubmit(e) {
-            e.preventDefault();
-            const form = e.target;
-            const formData = new FormData(form);
-            const data = {};
-            
-            // Collect data
-            for (let [key, value] of formData.entries()) {
-                data[key] = value;
-            }
-
-            // Show loading state on button
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Saving...';
-            submitBtn.disabled = true;
-
-            try {
-                const botId = getBotId();
-                const leadSessionId = generateUUID(); // Temporary session ID for lead
-
-                // 1. Save to Supabase
-                if (supabaseClient) {
-                    const { error } = await supabaseClient
-                        .from('leads')
-                        .insert({
-                            bot_id: botId,
-                            session_id: leadSessionId,
-                            name: data.name,
-                            email: data.email,
-                            phone: data.phone,
-                            metadata: data
-                        });
-                    
-                    if (error) throw error;
-                }
-
-                // 2. Save to LocalStorage (mark as submitted)
-                localStorage.setItem(`n8n_chat_lead_${botId}`, JSON.stringify(data));
-
-                // 3. Start Conversation
-                chatContainer.querySelector('.lead-form-interface').classList.remove('active');
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-                
-                startNewConversation(chatContainer, chatInterface, messagesContainer, null);
-
-            } catch (error) {
-                console.error('Error saving lead:', error);
-                submitBtn.textContent = 'Error. Try again.';
-                setTimeout(() => {
-                    submitBtn.textContent = originalText;
-                    submitBtn.disabled = false;
-                }, 2000);
-            }
-        }
-
-        // Form Submit Listener
-        const leadForm = container.querySelector('#n8n-lead-form');
-         if (leadForm) {
-            leadForm.addEventListener('submit', handleFormSubmit);
-        }
-
-        // Start conversation (New Chat Button -> Forces NEW session)
-        newChatBtn.addEventListener('click', () => {
-            // Check if we need to collect leads first
-            if (checkLeadRequired()) {
-                showLeadForm();
-            } else {
-                // Clear local storage for this bot session (but maybe keep lead info? Yes, distinct keys)
-                localStorage.removeItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
-                messagesContainer.innerHTML = '';
-                startNewConversation(chatContainer, chatInterface, messagesContainer, null);
-            }
-        });
-
-        // Auto-Resume logic (Check local storage)
-        const savedSessionId = localStorage.getItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
-        if (savedSessionId && config.behavior.rememberConversation) {
-            // Only resume if lead form is satisfied or not needed
-            // If user has a session, they passed the form presumably. 
-            // But if they cleared cache partially? 
-            // Simpler: If session exists, assume authorized.
-            
-            startNewConversation(chatContainer, chatInterface, messagesContainer, savedSessionId);
-
-            // Open widget if configured
-            if (config.behavior.autoOpenOnLoad) {
-                setTimeout(() => chatContainer.classList.add('open'), 500);
-            }
-        } else if (config.behavior.autoOpenOnLoad) {
-            // No session, but auto open.
-            // If lead form required, show it? Or show welcome screen?
-            // Usually Welcome Screen -> Click Start -> Form -> Chat
-            // So we just open the widget to the Welcome Screen
-             setTimeout(() => chatContainer.classList.add('open'), 500);
-        }
-
-        // Send message
-        sendButton.addEventListener('click', () => {
-            const message = textarea.value.trim();
-            if (message) {
-                sendMessage(message, messagesContainer);
-                textarea.value = '';
-                textarea.style.height = 'auto';
-            }
-        });
-
+        // Start conversation (New or Resume)
         // Enter to send
         textarea.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1351,6 +1261,119 @@
                 }
             }
         });
+    }
+
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        // Find container references
+        const container = form.closest('.n8n-chat-widget');
+        const chatContainer = container.querySelector('.chat-container');
+        const chatInterface = container.querySelector('.chat-interface');
+        const messagesContainer = container.querySelector('.chat-messages');
+
+        const formData = new FormData(form);
+        const data = {};
+
+        // Collect data
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+
+        // Show loading state on button
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.disabled = true;
+
+        try {
+            const botId = getBotId();
+            const leadSessionId = generateUUID(); // Temporary session ID for lead
+
+            // 1. Save to Supabase
+            if (supabaseClient) {
+                const { error } = await supabaseClient
+                    .from('leads')
+                    .insert({
+                        bot_id: botId,
+                        session_id: leadSessionId,
+                        name: data.name,
+                        email: data.email,
+                        phone: data.phone,
+                        metadata: data
+                    });
+
+                if (error) throw error;
+            }
+
+            // 2. Save to LocalStorage (mark as submitted)
+            localStorage.setItem(`n8n_chat_lead_${botId}`, JSON.stringify(data));
+
+            // 3. Start Conversation
+            chatContainer.querySelector('.lead-form-interface').classList.remove('active');
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+
+            startNewConversation(chatContainer, chatInterface, messagesContainer, null);
+
+        } catch (error) {
+            console.error('Error saving lead:', error);
+            submitBtn.textContent = 'Error. Try again.';
+            setTimeout(() => {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }, 2000);
+        }
+    }
+
+    // Start conversation (New or Resume)
+    async function startNewConversation(chatContainer, chatInterface, messagesContainer, resumeSessionId = null) {
+
+        let isResuming = false;
+
+        if (resumeSessionId) {
+            currentSessionId = resumeSessionId;
+            isResuming = true;
+        } else {
+            // Generate NEW session
+            currentSessionId = generateUUID();
+            // Save to LocalStorage
+            const storageKey = `n8n_chat_session_${config.branding.botId || getBotId()}`;
+            localStorage.setItem(storageKey, currentSessionId);
+        }
+
+        // Subscribe to Realtime Updates
+        subscribeToMessages(messagesContainer);
+
+        // Show chat interface
+        chatContainer.querySelector('.welcome-screen-interface').style.display = 'none';
+        chatContainer.querySelector('.lead-form-interface').classList.remove('active');
+        chatInterface.classList.add('active');
+
+        // Check History if resuming
+        let historyLoaded = false;
+        if (isResuming) {
+            historyLoaded = await loadChatHistory(currentSessionId, messagesContainer);
+        }
+
+        // Only show welcome message if NOT resuming or if history was empty
+        if (!historyLoaded) {
+            // Check if welcome message already exists in UI to avoid duplicates if partial load
+            if (messagesContainer.children.length === 0) {
+                const botMessageDiv = document.createElement('div');
+                botMessageDiv.className = 'chat-message bot';
+                messagesContainer.appendChild(botMessageDiv);
+
+                const welcomeMessage = config.branding.welcomeText || 'Hello! How can I help you today?';
+
+                await typeMessage(welcomeMessage, botMessageDiv);
+
+                // Save welcome message to DB so it appears in history next time
+                saveMessageToDB(welcomeMessage, 'bot', { is_welcome: true });
+            }
+        }
+
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     // Typing animation helpers
