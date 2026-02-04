@@ -171,7 +171,8 @@
                 autoOpenDelay: dbConfig.auto_open_delay_ms || 0,
                 rememberConversation: dbConfig.remember_conversation !== false
             },
-            customCss: dbConfig.custom_css
+            customCss: dbConfig.custom_css,
+            leadCollection: dbConfig.lead_collection || { enabled: false, title: 'Contact Info', fields: [] }
         };
     }
 
@@ -950,6 +951,69 @@
             }
 
             ${config.customCss || ''}
+
+            /* Lead Form Styles */
+            .n8n-chat-widget .lead-form-interface {
+                display: none;
+                flex-direction: column;
+                height: 100%;
+                background: var(--chat--color-surface);
+            }
+
+            .n8n-chat-widget .lead-form-interface.active {
+                display: flex;
+            }
+
+            .n8n-chat-widget .lead-form-content {
+                padding: 24px;
+                overflow-y: auto;
+                flex: 1;
+            }
+
+            .n8n-chat-widget .lead-form-title {
+                margin: 0 0 20px 0;
+                font-size: 18px;
+                font-weight: 600;
+                color: var(--chat--color-font);
+                text-align: center;
+            }
+
+            .n8n-chat-widget .form-group {
+                margin-bottom: 16px;
+            }
+
+            .n8n-chat-widget .form-label {
+                display: block;
+                margin-bottom: 6px;
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--chat--color-font);
+            }
+
+            .n8n-chat-widget .form-input {
+                width: 100%;
+                padding: 10px 12px;
+                border: 1px solid var(--chat--color-border);
+                border-radius: ${config.ui.buttonBorderRadius}px;
+                font-size: 14px;
+                color: var(--chat--color-font);
+                background: var(--chat--color-background);
+                font-family: inherit;
+                box-sizing: border-box; /* Important for padding */
+            }
+
+            .n8n-chat-widget .form-input:focus {
+                outline: none;
+                border-color: var(--chat--color-primary);
+                box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+            }
+
+            .n8n-chat-widget .form-error {
+                color: #dc3545;
+                font-size: 12px;
+                margin-top: 4px;
+                display: none;
+            }
         `;
 
         const styleSheet = document.createElement('style');
@@ -1037,7 +1101,36 @@
             </div>
         `;
 
-        chatContainer.innerHTML = newConversationHTML + chatInterfaceHTML;
+        // Lead Form Interface
+        const leadFormHTML = `
+            <div class="lead-form-interface">
+                <div class="brand-header">
+                    <div class="logo-container">${logoContent}</div>
+                    <div class="brand-header-text">
+                        <span>${config.branding.name}</span>
+                        <div class="brand-status">Contact Details</div>
+                    </div>
+                    <button class="close-button" aria-label="Close chat">×</button>
+                </div>
+                <div class="lead-form-content">
+                    <h3 class="lead-form-title">${config.leadCollection?.title || 'Share your details'}</h3>
+                    <p class="response-text" style="text-align: center; margin-bottom: 20px;">
+                        Please fill out the form below to start chatting.
+                    </p>
+                    <form id="n8n-lead-form">
+                        <div id="lead-form-fields"></div>
+                        <button type="submit" class="new-chat-btn" style="width: 100%; margin-top: 10px;">
+                            ${config.branding.startButtonText || 'Start Chat'}
+                        </button>
+                    </form>
+                </div>
+                <div class="chat-footer">
+                    <a href="${config.branding.poweredBy.link}" target="${config.branding.poweredBy.newTab ? '_blank' : '_self'}" rel="noopener">${config.branding.poweredBy.text}</a>
+                </div>
+            </div>
+        `;
+
+        chatContainer.innerHTML = newConversationHTML + leadFormHTML + chatInterfaceHTML;
 
         // Setup event listeners
         setupEventListeners(container);
@@ -1089,28 +1182,151 @@
             });
         }
 
+        // Form Handling Helpers
+        function checkLeadRequired() {
+            if (!config.leadCollection?.enabled) return false;
+            
+            // Check if we already have this user's details saved locally
+            const savedLead = localStorage.getItem(`n8n_chat_lead_${config.branding.botId || getBotId()}`);
+            return !savedLead;
+        }
+
+        function renderLeadForm() {
+            const fieldsContainer = container.querySelector('#lead-form-fields');
+            fieldsContainer.innerHTML = '';
+
+            const fields = config.leadCollection.fields || [];
+            
+            // Default fields if none configured but enabled
+            if (fields.length === 0) {
+                fields.push({ name: 'name', label: 'Name', type: 'text', required: true });
+                fields.push({ name: 'email', label: 'Email', type: 'email', required: true });
+            }
+
+            fields.forEach(field => {
+                const group = document.createElement('div');
+                group.className = 'form-group';
+                
+                const label = document.createElement('label');
+                label.className = 'form-label';
+                label.textContent = field.label;
+                group.appendChild(label);
+
+                const input = document.createElement('input');
+                input.className = 'form-input';
+                input.type = field.type;
+                input.name = field.name;
+                if (field.required) input.required = true;
+                if (field.placeholder) input.placeholder = field.placeholder;
+                group.appendChild(input);
+
+                fieldsContainer.appendChild(group);
+            });
+        }
+
+        function showLeadForm() {
+            renderLeadForm();
+            chatContainer.querySelector('.new-conversation').style.display = 'none';
+            chatContainer.querySelector('.chat-interface').classList.remove('active');
+            chatContainer.querySelector('.lead-form-interface').classList.add('active');
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const formData = new FormData(form);
+            const data = {};
+            
+            // Collect data
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+
+            // Show loading state on button
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Saving...';
+            submitBtn.disabled = true;
+
+            try {
+                const botId = getBotId();
+                const leadSessionId = generateUUID(); // Temporary session ID for lead
+
+                // 1. Save to Supabase
+                if (supabaseClient) {
+                    const { error } = await supabaseClient
+                        .from('leads')
+                        .insert({
+                            bot_id: botId,
+                            session_id: leadSessionId,
+                            name: data.name,
+                            email: data.email,
+                            phone: data.phone,
+                            metadata: data
+                        });
+                    
+                    if (error) throw error;
+                }
+
+                // 2. Save to LocalStorage (mark as submitted)
+                localStorage.setItem(`n8n_chat_lead_${botId}`, JSON.stringify(data));
+
+                // 3. Start Conversation
+                chatContainer.querySelector('.lead-form-interface').classList.remove('active');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                
+                startNewConversation(chatContainer, chatInterface, messagesContainer, null);
+
+            } catch (error) {
+                console.error('Error saving lead:', error);
+                submitBtn.textContent = 'Error. Try again.';
+                setTimeout(() => {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }, 2000);
+            }
+        }
+
+        // Form Submit Listener
+        const leadForm = container.querySelector('#n8n-lead-form');
+         if (leadForm) {
+            leadForm.addEventListener('submit', handleFormSubmit);
+        }
+
         // Start conversation (New Chat Button -> Forces NEW session)
         newChatBtn.addEventListener('click', () => {
-            // Clear local storage for this bot
-            localStorage.removeItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
-            // Clear UI
-            messagesContainer.innerHTML = '';
-            // Start fresh
-            startNewConversation(chatContainer, chatInterface, messagesContainer, null);
+            // Check if we need to collect leads first
+            if (checkLeadRequired()) {
+                showLeadForm();
+            } else {
+                // Clear local storage for this bot session (but maybe keep lead info? Yes, distinct keys)
+                localStorage.removeItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
+                messagesContainer.innerHTML = '';
+                startNewConversation(chatContainer, chatInterface, messagesContainer, null);
+            }
         });
 
         // Auto-Resume logic (Check local storage)
         const savedSessionId = localStorage.getItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
         if (savedSessionId && config.behavior.rememberConversation) {
-            // Auto-open if configured, or just prep the UI?
-            // If we auto-open, we skip the "Start Chat" screen
-            // Let's swap the UI immediately
+            // Only resume if lead form is satisfied or not needed
+            // If user has a session, they passed the form presumably. 
+            // But if they cleared cache partially? 
+            // Simpler: If session exists, assume authorized.
+            
             startNewConversation(chatContainer, chatInterface, messagesContainer, savedSessionId);
 
             // Open widget if configured
             if (config.behavior.autoOpenOnLoad) {
                 setTimeout(() => chatContainer.classList.add('open'), 500);
             }
+        } else if (config.behavior.autoOpenOnLoad) {
+            // No session, but auto open.
+            // If lead form required, show it? Or show welcome screen?
+            // Usually Welcome Screen -> Click Start -> Form -> Chat
+            // So we just open the widget to the Welcome Screen
+             setTimeout(() => chatContainer.classList.add('open'), 500);
         }
 
         // Send message

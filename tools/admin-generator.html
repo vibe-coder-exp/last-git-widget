@@ -275,6 +275,32 @@
                     </div>
                 </div>
 
+                <!-- LEAD COLLECTION -->
+                <div class="card">
+                    <h2>Lead Collection (Pre-Chat Form)</h2>
+                    <div class="form-group">
+                        <label class="checkbox-group">
+                            <input type="checkbox" id="lead_enabled"> Enable Pre-chat Form
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Form Title</label>
+                        <input type="text" id="lead_title" value="Share your details">
+                    </div>
+                    <label style="margin-top: 12px;">Fields to Collect (All required for now)</label>
+                    <div class="form-grid">
+                        <label class="checkbox-group">
+                            <input type="checkbox" id="lead_field_name" checked disabled> Name (Always required)
+                        </label>
+                        <label class="checkbox-group">
+                            <input type="checkbox" id="lead_field_email" checked> Email
+                        </label>
+                        <label class="checkbox-group">
+                            <input type="checkbox" id="lead_field_phone"> Phone
+                        </label>
+                    </div>
+                </div>
+
                 <!-- LIMITS -->
                 <div class="card">
                     <h2>Usage Limits & Access</h2>
@@ -367,6 +393,7 @@ INSERT INTO public.bot_configurations (
     company_name,
     webhook_url,
     webhook_route,
+    lead_collection,
     
     logo_url,
     favicon_url,
@@ -404,6 +431,7 @@ INSERT INTO public.bot_configurations (
     '${escapeSql(getValue('company_name'))}',
     '${escapeSql(getValue('webhook_url'))}',
     'general',
+    ${getLeadCollectionJSON()},
     
     '${escapeSql(getValue('logo_url'))}',
     '${escapeSql(getValue('favicon_url'))}',
@@ -440,6 +468,7 @@ ON CONFLICT (bot_id) DO UPDATE SET
     name = EXCLUDED.name,
     company_name = EXCLUDED.company_name,
     webhook_url = EXCLUDED.webhook_url,
+    lead_collection = EXCLUDED.lead_collection,
     logo_url = EXCLUDED.logo_url,
     favicon_url = EXCLUDED.favicon_url,
     primary_color = EXCLUDED.primary_color,
@@ -465,6 +494,32 @@ ON CONFLICT (bot_id) DO UPDATE SET
     updated_at = NOW();`;
 
             document.getElementById('sql-output').value = sql;
+        }
+
+        function getLeadCollectionJSON() {
+            const enabled = document.getElementById('lead_enabled').checked;
+            const title = escapeSql(document.getElementById('lead_title').value);
+
+            const fields = [];
+
+            // Name is hardcoded as enabled/required for this generator for simplicity
+            fields.push({ name: 'name', label: 'Name', type: 'text', required: true });
+
+            if (document.getElementById('lead_field_email').checked) {
+                fields.push({ name: 'email', label: 'Email', type: 'email', required: true });
+            }
+
+            if (document.getElementById('lead_field_phone').checked) {
+                fields.push({ name: 'phone', label: 'Phone', type: 'tel', required: true }); // using type 'tel'
+            }
+
+            const json = {
+                enabled: enabled,
+                title: title,
+                fields: fields
+            };
+
+            return `'${JSON.stringify(json)}'`;
         }
 
         function copyToClipboard() {
