@@ -590,6 +590,8 @@
                 display: none;
                 flex-direction: column;
                 height: 100%;
+                flex: 1; /* Ensure it takes up space */
+                min-height: 0; /* Fix for flex scrolling */
             }
 
             .n8n-chat-widget .chat-interface.active {
@@ -598,6 +600,10 @@
 
             .n8n-chat-widget .chat-messages {
                 flex: 1;
+                overflow-y: auto;
+                padding: 16px;
+                scroll-behavior: smooth;
+            }
                 overflow-y: auto;
                 padding: 20px;
                 background: var(--chat--color-surface);
@@ -1140,7 +1146,8 @@
             </div>
         `;
 
-        chatContainer.innerHTML = newConversationHTML + leadFormHTML + chatInterfaceHTML;
+        // Use join('') to prevent whitespace text nodes between elements in the flex container
+        chatContainer.innerHTML = [newConversationHTML, leadFormHTML, chatInterfaceHTML].join('').trim();
 
         // Setup event listeners
         setupEventListeners(container);
