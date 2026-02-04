@@ -603,9 +603,6 @@
                 overflow-y: auto;
                 padding: 16px;
                 scroll-behavior: smooth;
-            }
-                overflow-y: auto;
-                padding: 20px;
                 background: var(--chat--color-surface);
                 display: flex;
                 flex-direction: column;
