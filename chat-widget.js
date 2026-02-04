@@ -1261,6 +1261,25 @@
                 }
             }
         });
+
+        // Form Submit Listener
+        const leadForm = container.querySelector('#n8n-lead-form');
+        if (leadForm) {
+            leadForm.addEventListener('submit', handleFormSubmit);
+        }
+
+        // Start conversation (New Chat Button -> Forces NEW session)
+        newChatBtn.addEventListener('click', () => {
+            // Check if we need to collect leads first
+            if (checkLeadRequired()) {
+                showLeadForm();
+            } else {
+                // Clear local storage for this bot session
+                localStorage.removeItem(`n8n_chat_session_${config.branding.botId || getBotId()}`);
+                messagesContainer.innerHTML = '';
+                startNewConversation(chatContainer, chatInterface, messagesContainer, null);
+            }
+        });
     }
 
     async function handleFormSubmit(e) {
