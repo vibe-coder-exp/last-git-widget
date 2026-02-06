@@ -301,6 +301,26 @@
                     </div>
                 </div>
 
+                <!-- FEEDBACK SYSTEM -->
+                <div class="card">
+                    <h2>⭐ Feedback System</h2>
+                    <div class="form-grid">
+                        <label class="checkbox-group">
+                            <input type="checkbox" id="feedback_enabled" checked> Enable Feedback Rating
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Feedback Modal Title</label>
+                        <input type="text" id="feedback_title" value="Rate your experience"
+                            placeholder="How was your experience?">
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency (Hours between prompts)</label>
+                        <input type="number" id="feedback_frequency" value="24" min="1" max="720" placeholder="24">
+                        <small>Default: 24 hours (once per day)</small>
+                    </div>
+                </div>
+
                 <!-- LIMITS -->
                 <div class="card">
                     <h2>Usage Limits & Access</h2>
@@ -424,6 +444,8 @@ INSERT INTO public.bot_configurations (
     footer_text,
     footer_link,
     
+    feedback_settings,
+    
     updated_at
 ) VALUES (
     '${escapeSql(botId)}',
@@ -462,6 +484,8 @@ INSERT INTO public.bot_configurations (
     '${escapeSql(getValue('footer_text'))}',
     '${escapeSql(getValue('footer_link'))}',
     
+    '${getFeedbackSettingsJSON()}'::jsonb,
+    
     NOW()
 )
 ON CONFLICT (bot_id) DO UPDATE SET
@@ -491,6 +515,7 @@ ON CONFLICT (bot_id) DO UPDATE SET
     footer_show = EXCLUDED.footer_show,
     footer_text = EXCLUDED.footer_text,
     footer_link = EXCLUDED.footer_link,
+    feedback_settings = EXCLUDED.feedback_settings,
     updated_at = NOW();`;
 
             document.getElementById('sql-output').value = sql;
@@ -520,6 +545,20 @@ ON CONFLICT (bot_id) DO UPDATE SET
             };
 
             return `'${JSON.stringify(json)}'`;
+        }
+
+        function getFeedbackSettingsJSON() {
+            const enabled = document.getElementById('feedback_enabled').checked;
+            const title = escapeSql(document.getElementById('feedback_title').value || 'Rate your experience');
+            const frequency = parseInt(document.getElementById('feedback_frequency').value || 24);
+
+            const json = {
+                enabled: enabled,
+                title: title,
+                frequency_hours: frequency
+            };
+
+            return JSON.stringify(json).replace(/'/g, "''"); // Escape single quotes for SQL
         }
 
         function copyToClipboard() {

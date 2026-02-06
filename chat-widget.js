@@ -172,7 +172,8 @@
                 rememberConversation: dbConfig.remember_conversation !== false
             },
             customCss: dbConfig.custom_css,
-            leadCollection: dbConfig.lead_collection || { enabled: false, title: 'Contact Info', fields: [] }
+            leadCollection: dbConfig.lead_collection || { enabled: false, title: 'Contact Info', fields: [] },
+            feedbackSettings: dbConfig.feedback_settings || { enabled: true, title: 'Rate your experience', frequency_hours: 24 }
         };
     }
 
@@ -1025,6 +1026,122 @@
                 margin-top: 4px;
                 display: none;
             }
+
+            /* Feedback Modal Styles */
+            .n8n-feedback-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: fadeIn 200ms ease-out;
+            }
+
+            .n8n-feedback-overlay.active {
+                display: flex;
+            }
+
+            .n8n-feedback-modal {
+                background: white;
+                border-radius: 12px;
+                padding: 32px 24px;
+                max-width: 400px;
+                width: 90%;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                text-align: center;
+                animation: slideUp 300ms ease-out;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            @keyframes slideUp {
+                from { 
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to { 
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .n8n-feedback-title {
+                font-size: 20px;
+                font-weight: 600;
+                color: #333;
+                margin: 0 0 20px 0;
+            }
+
+            .n8n-feedback-stars {
+                display: flex;
+                justify-content: center;
+                gap: 8px;
+                margin: 20px 0;
+            }
+
+            .n8n-feedback-star {
+                font-size: 40px;
+                cursor: pointer;
+                color: #ddd;
+                transition: all 150ms ease;
+                user-select: none;
+            }
+
+            .n8n-feedback-star:hover,
+            .n8n-feedback-star.active {
+                color: #ffd700;
+                transform: scale(1.1);
+            }
+
+            .n8n-feedback-actions {
+                display: flex;
+                gap: 12px;
+                margin-top: 24px;
+            }
+
+            .n8n-feedback-btn {
+                flex: 1;
+                padding: 12px 20px;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 150ms ease;
+                font-family: inherit;
+            }
+
+            .n8n-feedback-btn-primary {
+                background: var(--chat--color-primary);
+                color: white;
+            }
+
+            .n8n-feedback-btn-primary:hover {
+                background: var(--chat--color-secondary);
+                transform: translateY(-1px);
+            }
+
+            .n8n-feedback-btn-primary:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+            .n8n-feedback-btn-secondary {
+                background: #f0f0f0;
+                color: #666;
+            }
+
+            .n8n-feedback-btn-secondary:hover {
+                background: #e0e0e0;
+            }
         `;
 
         const styleSheet = document.createElement('style');
@@ -1146,8 +1263,150 @@
         // Use join('') to prevent whitespace text nodes between elements in the flex container
         chatContainer.innerHTML = [newConversationHTML, leadFormHTML, chatInterfaceHTML].join('').trim();
 
-        // Setup event listeners
         setupEventListeners(container);
+    }
+
+    // ===================== FEEDBACK SYSTEM =====================
+
+    function checkFeedbackEligibility() {
+        // Check if feedback is enabled
+        if (!config.feedbackSettings?.enabled) return false;
+
+        const botId = getBotId();
+        const lastFeedbackKey = `n8n_feedback_last_${botId}`;
+        const lastFeedbackTime = localStorage.getItem(lastFeedbackKey);
+
+        if (!lastFeedbackTime) return true; // Never submitted
+
+        const hoursSinceLastFeedback = (Date.now() - parseInt(lastFeedbackTime)) / (1000 * 60 * 60);
+        const requiredHours = config.feedbackSettings.frequency_hours || 24;
+
+        return hoursSinceLastFeedback >= requiredHours;
+    }
+
+    function showFeedbackModal(container, chatContainer) {
+        // Create overlay if it doesn't exist
+        let overlay = document.querySelector('.n8n-feedback-overlay');
+
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'n8n-feedback-overlay';
+            overlay.innerHTML = `
+                <div class="n8n-feedback-modal">
+                    <h3 class="n8n-feedback-title">${config.feedbackSettings.title || 'Rate your experience'}</h3>
+                    <div class="n8n-feedback-stars">
+                        <span class="n8n-feedback-star" data-rating="1">★</span>
+                        <span class="n8n-feedback-star" data-rating="2">★</span>
+                        <span class="n8n-feedback-star" data-rating="3">★</span>
+                        <span class="n8n-feedback-star" data-rating="4">★</span>
+                        <span class="n8n-feedback-star" data-rating="5">★</span>
+                    </div>
+                    <div class="n8n-feedback-actions">
+                        <button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>
+                        <button class="n8n-feedback-btn n8n-feedback-btn-primary n8n-feedback-submit" disabled>Submit</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // Star rating interaction
+            let selectedRating = 0;
+            const stars = overlay.querySelectorAll('.n8n-feedback-star');
+            const submitBtn = overlay.querySelector('.n8n-feedback-submit');
+
+            stars.forEach(star => {
+                star.addEventListener('click', () => {
+                    selectedRating = parseInt(star.dataset.rating);
+
+                    // Update UI
+                    stars.forEach((s, idx) => {
+                        if (idx < selectedRating) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.remove('active');
+                        }
+                    });
+
+                    submitBtn.disabled = false;
+                });
+
+                // Hover effect
+                star.addEventListener('mouseenter', () => {
+                    const rating = parseInt(star.dataset.rating);
+                    stars.forEach((s, idx) => {
+                        if (idx < rating) {
+                            s.style.color = '#ffd700';
+                        }
+                    });
+                });
+            });
+
+            overlay.addEventListener('mouseleave', () => {
+                stars.forEach((s, idx) => {
+                    if (idx < selectedRating) {
+                        s.style.color = '#ffd700';
+                    } else {
+                        s.style.color = '#ddd';
+                    }
+                });
+            });
+
+            // Skip button
+            overlay.querySelector('.n8n-feedback-skip').addEventListener('click', () => {
+                overlay.classList.remove('active');
+                chatContainer.classList.remove('open');
+            });
+
+            // Submit button
+            submitBtn.addEventListener('click', async () => {
+                if (selectedRating > 0) {
+                    submitBtn.textContent = 'Saving...';
+                    submitBtn.disabled = true;
+
+                    await submitFeedback(selectedRating);
+
+                    overlay.classList.remove('active');
+                    chatContainer.classList.remove('open');
+
+                    // Reset for next time
+                    selectedRating = 0;
+                    stars.forEach(s => s.classList.remove('active'));
+                    submitBtn.textContent = 'Submit';
+                }
+            });
+        }
+
+        // Show the modal
+        overlay.classList.add('active');
+    }
+
+    async function submitFeedback(rating) {
+        try {
+            const botId = getBotId();
+            const leadId = localStorage.getItem(`n8n_chat_lead_id_${botId}`);
+
+            if (supabaseClient) {
+                const { error } = await supabaseClient
+                    .from('feedback')
+                    .insert({
+                        bot_id: botId,
+                        session_id: currentSessionId || 'unknown',
+                        lead_id: leadId || null,
+                        rating: rating
+                    });
+
+                if (error) {
+                    console.error('Error saving feedback:', error);
+                    return;
+                }
+            }
+
+            // Update last feedback time
+            localStorage.setItem(`n8n_feedback_last_${botId}`, Date.now().toString());
+            console.log('✅ Feedback submitted successfully');
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+        }
     }
 
     // Setup event listeners
@@ -1173,10 +1432,14 @@
             chatContainer.classList.toggle('open');
         });
 
-        // Close buttons
+        // Close buttons - intercept to check for feedback
         closeButtons.forEach(button => {
             button.addEventListener('click', () => {
-                chatContainer.classList.remove('open');
+                if (checkFeedbackEligibility()) {
+                    showFeedbackModal(container, chatContainer);
+                } else {
+                    chatContainer.classList.remove('open');
+                }
             });
         });
 
@@ -1329,9 +1592,9 @@
             const botId = getBotId();
             const leadSessionId = generateUUID(); // Temporary session ID for lead
 
-            // 1. Save to Supabase
+            // 1. Save to Supabase and get the created lead ID
             if (supabaseClient) {
-                const { error } = await supabaseClient
+                const { data: insertedData, error } = await supabaseClient
                     .from('leads')
                     .insert({
                         bot_id: botId,
@@ -1340,9 +1603,16 @@
                         email: data.email,
                         phone: data.phone,
                         metadata: data
-                    });
+                    })
+                    .select('id')
+                    .single();
 
                 if (error) throw error;
+
+                // Save the lead ID for cross-session tracking
+                if (insertedData?.id) {
+                    localStorage.setItem(`n8n_chat_lead_id_${botId}`, insertedData.id);
+                }
             }
 
             // 2. Save to LocalStorage (mark as submitted)
