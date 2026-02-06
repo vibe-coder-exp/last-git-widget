@@ -1051,10 +1051,14 @@
                 border-radius: 12px;
                 padding: 32px 24px;
                 max-width: 400px;
+                max-height: 90vh;
                 width: 90%;
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                 text-align: center;
                 animation: slideUp 300ms ease-out;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
             }
 
             @keyframes fadeIn {
@@ -1104,9 +1108,11 @@
             .n8n-feedback-actions {
                 display: flex;
                 gap: 12px;
-                margin-top: 24px;
+                margin-top: auto;
+                padding-top: 24px;
                 width: 100%;
                 justify-content: center;
+                flex-shrink: 0;
             }
 
             .n8n-feedback-btn {
@@ -1553,6 +1559,16 @@
                     textarea.value = '';
                     textarea.style.height = 'auto';
                 }
+            }
+        });
+
+        // Send button click
+        sendButton.addEventListener('click', () => {
+            const message = textarea.value.trim();
+            if (message) {
+                sendMessage(message, messagesContainer);
+                textarea.value = '';
+                textarea.style.height = 'auto';
             }
         });
 
