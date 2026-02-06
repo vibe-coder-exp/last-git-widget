@@ -173,7 +173,7 @@
             },
             customCss: dbConfig.custom_css,
             leadCollection: dbConfig.lead_collection || { enabled: false, title: 'Contact Info', fields: [] },
-            feedbackSettings: dbConfig.feedback_settings || { enabled: true, title: 'Rate your experience', frequency_hours: 24 }
+            feedbackSettings: dbConfig.feedback_settings || { enabled: true, title: 'Rate your experience', frequency_hours: 24, show_skip_button: true }
         };
     }
 
@@ -1285,102 +1285,123 @@
     }
 
     function showFeedbackModal(container, chatContainer) {
-        // Create overlay if it doesn't exist
-        let overlay = document.querySelector('.n8n-feedback-overlay');
+        // Remove existing overlay if present to avoid duplicates
+        let existingOverlay = document.querySelector('.n8n-feedback-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
 
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.className = 'n8n-feedback-overlay';
-            overlay.innerHTML = `
-                <div class="n8n-feedback-modal">
-                    <h3 class="n8n-feedback-title">${config.feedbackSettings.title || 'Rate your experience'}</h3>
-                    <div class="n8n-feedback-stars">
-                        <span class="n8n-feedback-star" data-rating="1">★</span>
-                        <span class="n8n-feedback-star" data-rating="2">★</span>
-                        <span class="n8n-feedback-star" data-rating="3">★</span>
-                        <span class="n8n-feedback-star" data-rating="4">★</span>
-                        <span class="n8n-feedback-star" data-rating="5">★</span>
-                    </div>
-                    <div class="n8n-feedback-actions">
-                        <button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>
-                        <button class="n8n-feedback-btn n8n-feedback-btn-primary n8n-feedback-submit" disabled>Submit</button>
-                    </div>
+        // Create fresh overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'n8n-feedback-overlay';
+
+        const showSkip = config.feedbackSettings.show_skip_button !== false; // default true
+
+        overlay.innerHTML = `
+            <div class="n8n-feedback-modal">
+                <h3 class="n8n-feedback-title">${config.feedbackSettings.title || 'Rate your experience'}</h3>
+                <div class="n8n-feedback-stars" id="feedback-stars">
+                    <span class="n8n-feedback-star" data-rating="1">★</span>
+                    <span class="n8n-feedback-star" data-rating="2">★</span>
+                    <span class="n8n-feedback-star" data-rating="3">★</span>
+                    <span class="n8n-feedback-star" data-rating="4">★</span>
+                    <span class="n8n-feedback-star" data-rating="5">★</span>
                 </div>
-            `;
-            document.body.appendChild(overlay);
+                <div class="n8n-feedback-comment" style="margin-top: 16px; display: none;">
+                    <textarea id="feedback-comment-text" placeholder="Tell us more (optional)" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-family: inherit; font-size: 14px;"></textarea>
+                </div>
+                <div class="n8n-feedback-actions">
+                    ${showSkip ? '<button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>' : ''}
+                    <button class="n8n-feedback-btn n8n-feedback-btn-primary n8n-feedback-submit" disabled>Submit</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
 
-            // Star rating interaction
-            let selectedRating = 0;
-            const stars = overlay.querySelectorAll('.n8n-feedback-star');
-            const submitBtn = overlay.querySelector('.n8n-feedback-submit');
+        // Star rating interaction
+        let selectedRating = 0;
+        const stars = overlay.querySelectorAll('.n8n-feedback-star');
+        const submitBtn = overlay.querySelector('.n8n-feedback-submit');
+        const starsContainer = overlay.querySelector('#feedback-stars');
+        const commentSection = overlay.querySelector('.n8n-feedback-comment');
 
-            stars.forEach(star => {
-                star.addEventListener('click', () => {
-                    selectedRating = parseInt(star.dataset.rating);
+        // Click handler for stars
+        stars.forEach((star, index) => {
+            star.addEventListener('click', () => {
+                selectedRating = parseInt(star.dataset.rating);
+                updateStars(selectedRating);
+                submitBtn.disabled = false;
 
-                    // Update UI
-                    stars.forEach((s, idx) => {
-                        if (idx < selectedRating) {
-                            s.classList.add('active');
-                        } else {
-                            s.classList.remove('active');
-                        }
-                    });
-
-                    submitBtn.disabled = false;
-                });
-
-                // Hover effect
-                star.addEventListener('mouseenter', () => {
-                    const rating = parseInt(star.dataset.rating);
-                    stars.forEach((s, idx) => {
-                        if (idx < rating) {
-                            s.style.color = '#ffd700';
-                        }
-                    });
-                });
+                // Show comment field after rating
+                if (commentSection) {
+                    commentSection.style.display = 'block';
+                }
             });
 
-            overlay.addEventListener('mouseleave', () => {
-                stars.forEach((s, idx) => {
-                    if (idx < selectedRating) {
-                        s.style.color = '#ffd700';
-                    } else {
-                        s.style.color = '#ddd';
-                    }
-                });
+            // Hover effect
+            star.addEventListener('mouseenter', () => {
+                const rating = parseInt(star.dataset.rating);
+                highlightStars(rating);
             });
+        });
 
-            // Skip button
-            overlay.querySelector('.n8n-feedback-skip').addEventListener('click', () => {
-                overlay.classList.remove('active');
-                chatContainer.classList.remove('open');
-            });
+        // Reset stars on mouse leave from container
+        starsContainer.addEventListener('mouseleave', () => {
+            updateStars(selectedRating);
+        });
 
-            // Submit button
-            submitBtn.addEventListener('click', async () => {
-                if (selectedRating > 0) {
-                    submitBtn.textContent = 'Saving...';
-                    submitBtn.disabled = true;
-
-                    await submitFeedback(selectedRating);
-
-                    overlay.classList.remove('active');
-                    chatContainer.classList.remove('open');
-
-                    // Reset for next time
-                    selectedRating = 0;
-                    stars.forEach(s => s.classList.remove('active'));
-                    submitBtn.textContent = 'Submit';
+        function updateStars(rating) {
+            stars.forEach((s, idx) => {
+                if (idx < rating) {
+                    s.classList.add('active');
+                    s.style.color = '#ffd700';
+                } else {
+                    s.classList.remove('active');
+                    s.style.color = '#ddd';
                 }
             });
         }
+
+        function highlightStars(rating) {
+            stars.forEach((s, idx) => {
+                if (idx < rating) {
+                    s.style.color = '#ffd700';
+                } else {
+                    s.style.color = '#ddd';
+                }
+            });
+        }
+
+        // Skip button (if enabled)
+        if (showSkip) {
+            const skipBtn = overlay.querySelector('.n8n-feedback-skip');
+            if (skipBtn) {
+                skipBtn.addEventListener('click', () => {
+                    overlay.remove();
+                    chatContainer.classList.remove('open');
+                });
+            }
+        }
+
+        // Submit button
+        submitBtn.addEventListener('click', async () => {
+            if (selectedRating > 0) {
+                submitBtn.textContent = 'Saving...';
+                submitBtn.disabled = true;
+
+                const commentText = overlay.querySelector('#feedback-comment-text')?.value || '';
+                await submitFeedback(selectedRating, commentText);
+
+                overlay.remove();
+                chatContainer.classList.remove('open');
+            }
+        });
 
         // Show the modal
         overlay.classList.add('active');
     }
 
-    async function submitFeedback(rating) {
+    async function submitFeedback(rating, comment = '') {
         try {
             const botId = getBotId();
             const leadId = localStorage.getItem(`n8n_chat_lead_id_${botId}`);
@@ -1392,7 +1413,8 @@
                         bot_id: botId,
                         session_id: currentSessionId || 'unknown',
                         lead_id: leadId || null,
-                        rating: rating
+                        rating: rating,
+                        comment: comment || null
                     });
 
                 if (error) {

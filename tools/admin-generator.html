@@ -319,6 +319,11 @@
                         <input type="number" id="feedback_frequency" value="24" min="1" max="720" placeholder="24">
                         <small>Default: 24 hours (once per day)</small>
                     </div>
+                    <div class="form-grid">
+                        <label class="checkbox-group">
+                            <input type="checkbox" id="feedback_show_skip" checked> Show "Skip" Button
+                        </label>
+                    </div>
                 </div>
 
                 <!-- LIMITS -->
@@ -551,11 +556,13 @@ ON CONFLICT (bot_id) DO UPDATE SET
             const enabled = document.getElementById('feedback_enabled').checked;
             const title = escapeSql(document.getElementById('feedback_title').value || 'Rate your experience');
             const frequency = parseInt(document.getElementById('feedback_frequency').value || 24);
+            const showSkip = document.getElementById('feedback_show_skip').checked;
 
             const json = {
                 enabled: enabled,
                 title: title,
-                frequency_hours: frequency
+                frequency_hours: frequency,
+                show_skip_button: showSkip
             };
 
             return JSON.stringify(json).replace(/'/g, "''"); // Escape single quotes for SQL
