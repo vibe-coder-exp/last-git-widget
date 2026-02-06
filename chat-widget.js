@@ -1117,6 +1117,7 @@
 
             .n8n-feedback-btn {
                 flex: 1;
+                min-width: 100px;
                 padding: 12px 20px;
                 border: none;
                 border-radius: 8px;
@@ -1306,6 +1307,13 @@
 
         const showSkip = config.feedbackSettings.show_skip_button !== false; // default true
 
+        // Build button HTML separately to ensure it renders
+        let buttonsHTML = '';
+        if (showSkip) {
+            buttonsHTML += '<button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>';
+        }
+        buttonsHTML += '<button class="n8n-feedback-btn n8n-feedback-btn-primary n8n-feedback-submit" disabled>Submit</button>';
+
         overlay.innerHTML = `
             <div class="n8n-feedback-modal">
                 <h3 class="n8n-feedback-title">${config.feedbackSettings.title || 'Rate your experience'}</h3>
@@ -1320,8 +1328,7 @@
                     <textarea id="feedback-comment-text" placeholder="Tell us more (optional)" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-family: inherit; font-size: 14px;"></textarea>
                 </div>
                 <div class="n8n-feedback-actions">
-                    ${showSkip ? `<button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>` : ''}
-                    <button class="n8n-feedback-btn n8n-feedback-btn-primary n8n-feedback-submit" disabled>Submit</button>
+                    ${buttonsHTML}
                 </div>
             </div>
         `;
@@ -1334,7 +1341,13 @@
         const starsContainer = overlay.querySelector('#feedback-stars');
         const commentSection = overlay.querySelector('.n8n-feedback-comment');
 
-        console.log('Feedback Modal Debug:', { submitBtn, stars: stars.length, showSkip });
+        console.log('Feedback Modal Debug:', {
+            submitBtn: submitBtn,
+            submitBtnExists: !!submitBtn,
+            stars: stars.length,
+            showSkip,
+            buttonsHTML: overlay.querySelector('.n8n-feedback-actions').innerHTML
+        });
 
         // Click handler for stars
         stars.forEach((star, index) => {
@@ -1562,15 +1575,37 @@
             }
         });
 
-        // Send button click
-        sendButton.addEventListener('click', () => {
-            const message = textarea.value.trim();
-            if (message) {
-                sendMessage(message, messagesContainer);
-                textarea.value = '';
-                textarea.style.height = 'auto';
-            }
-        });
+        // Send button - Support both click and touch for mobile
+        if (!sendButton) {
+            console.error('❌ Send button not found! Selector: button[type="submit"]');
+        } else {
+            console.log('✅ Send button found, attaching listeners');
+
+            const handleSendMessage = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('📤 Send button triggered');
+
+                const message = textarea.value.trim();
+                if (message) {
+                    console.log('Sending message:', message);
+                    sendMessage(message, messagesContainer);
+                    textarea.value = '';
+                    textarea.style.height = 'auto';
+                } else {
+                    console.warn('No message to send (textarea empty)');
+                }
+            };
+
+            sendButton.addEventListener('click', handleSendMessage, false);
+            sendButton.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSendMessage(e);
+            }, false);
+
+            console.log('✅ Send button listeners attached successfully');
+        }
 
         // Form Submit Listener
         const leadForm = container.querySelector('#n8n-lead-form');
