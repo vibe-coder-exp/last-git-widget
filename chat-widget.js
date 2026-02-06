@@ -1105,6 +1105,8 @@
                 display: flex;
                 gap: 12px;
                 margin-top: 24px;
+                width: 100%;
+                justify-content: center;
             }
 
             .n8n-feedback-btn {
@@ -1124,14 +1126,15 @@
                 color: white;
             }
 
-            .n8n-feedback-btn-primary:hover {
+            .n8n-feedback-btn-primary:hover:not(:disabled) {
                 background: var(--chat--color-secondary);
                 transform: translateY(-1px);
             }
 
             .n8n-feedback-btn-primary:disabled {
-                opacity: 0.5;
+                opacity: 0.6;
                 cursor: not-allowed;
+                background: #ccc;
             }
 
             .n8n-feedback-btn-secondary {
@@ -1311,7 +1314,7 @@
                     <textarea id="feedback-comment-text" placeholder="Tell us more (optional)" rows="3" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-family: inherit; font-size: 14px;"></textarea>
                 </div>
                 <div class="n8n-feedback-actions">
-                    ${showSkip ? '<button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>' : ''}
+                    ${showSkip ? `<button class="n8n-feedback-btn n8n-feedback-btn-secondary n8n-feedback-skip">Skip</button>` : ''}
                     <button class="n8n-feedback-btn n8n-feedback-btn-primary n8n-feedback-submit" disabled>Submit</button>
                 </div>
             </div>
@@ -1324,6 +1327,8 @@
         const submitBtn = overlay.querySelector('.n8n-feedback-submit');
         const starsContainer = overlay.querySelector('#feedback-stars');
         const commentSection = overlay.querySelector('.n8n-feedback-comment');
+
+        console.log('Feedback Modal Debug:', { submitBtn, stars: stars.length, showSkip });
 
         // Click handler for stars
         stars.forEach((star, index) => {
