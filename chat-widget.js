@@ -1139,9 +1139,9 @@
             }
 
             .n8n-feedback-btn-primary:disabled {
-                opacity: 0.6;
+                opacity: 0.65;
                 cursor: not-allowed;
-                background: #ccc;
+                filter: brightness(0.9);
             }
 
             .n8n-feedback-btn-secondary {
