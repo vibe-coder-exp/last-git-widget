@@ -1570,24 +1570,16 @@
         });
 
         // Send button - Support both click and touch for mobile
-        if (!sendButton) {
-            console.error('❌ Send button not found! Selector: button[type="submit"]');
-        } else {
-            console.log('✅ Send button found, attaching listeners');
-
+        if (sendButton) {
             const handleSendMessage = (e) => {
                 if (e.cancelable) e.preventDefault();
                 e.stopPropagation();
-                console.log('📤 Send button triggered');
 
                 const message = textarea.value.trim();
                 if (message) {
-                    console.log('Sending message:', message);
                     sendMessage(message, messagesContainer);
                     textarea.value = '';
                     textarea.style.height = 'auto';
-                } else {
-                    console.warn('No message to send (textarea empty)');
                 }
             };
 
@@ -1597,8 +1589,6 @@
                 e.stopPropagation();
                 handleSendMessage(e);
             }, false);
-
-            console.log('✅ Send button listeners attached successfully');
         }
 
         // Form Submit Listener
@@ -1663,28 +1653,26 @@
         try {
             const botId = getBotId();
             const leadSessionId = generateUUID(); // Temporary session ID for lead
+            const leadId = generateUUID(); // Generate ID client-side to avoid RLS select issues
 
-            // 1. Save to Supabase and get the created lead ID
+            // 1. Save to Supabase
             if (supabaseClient) {
-                const { data: insertedData, error } = await supabaseClient
+                const { error } = await supabaseClient
                     .from('leads')
                     .insert({
+                        id: leadId,
                         bot_id: botId,
                         session_id: leadSessionId,
                         name: data.name,
                         email: data.email,
                         phone: data.phone,
                         metadata: data
-                    })
-                    .select('id')
-                    .single();
+                    });
 
                 if (error) throw error;
 
                 // Save the lead ID for cross-session tracking
-                if (insertedData?.id) {
-                    localStorage.setItem(`n8n_chat_lead_id_${botId}`, insertedData.id);
-                }
+                localStorage.setItem(`n8n_chat_lead_id_${botId}`, leadId);
             }
 
             // 2. Save to LocalStorage (mark as submitted)
