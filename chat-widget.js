@@ -1457,7 +1457,7 @@
         const chatInterface = container.querySelector('.chat-interface');
         const messagesContainer = container.querySelector('.chat-messages');
         const textarea = container.querySelector('textarea');
-        const sendButton = container.querySelector('button[type="submit"]');
+        const sendButton = container.querySelector('.chat-input button[type="submit"]');
         const closeButtons = container.querySelectorAll('.close-button');
 
         // Auto-resize textarea
@@ -1576,7 +1576,7 @@
             console.log('✅ Send button found, attaching listeners');
 
             const handleSendMessage = (e) => {
-                e.preventDefault();
+                if (e.cancelable) e.preventDefault();
                 e.stopPropagation();
                 console.log('📤 Send button triggered');
 
@@ -1593,7 +1593,7 @@
 
             sendButton.addEventListener('click', handleSendMessage, false);
             sendButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
+                if (e.cancelable) e.preventDefault();
                 e.stopPropagation();
                 handleSendMessage(e);
             }, false);
