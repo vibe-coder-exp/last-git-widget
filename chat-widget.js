@@ -1139,9 +1139,10 @@
             }
 
             .n8n-feedback-btn-primary:disabled {
-                opacity: 0.65;
+                background: var(--chat--color-primary);
+                opacity: 0.7;
                 cursor: not-allowed;
-                filter: brightness(0.9);
+                color: white;
             }
 
             .n8n-feedback-btn-secondary {
@@ -1341,6 +1342,7 @@
         const starsContainer = overlay.querySelector('#feedback-stars');
         const commentSection = overlay.querySelector('.n8n-feedback-comment');
 
+
         console.log('Feedback Modal Debug:', {
             submitBtn: submitBtn,
             submitBtnExists: !!submitBtn,
@@ -1348,6 +1350,20 @@
             showSkip,
             buttonsHTML: overlay.querySelector('.n8n-feedback-actions').innerHTML
         });
+
+        // Debug button visibility
+        if (submitBtn) {
+            const styles = window.getComputedStyle(submitBtn);
+            console.log('Submit Button Styles:', {
+                display: styles.display,
+                visibility: styles.visibility,
+                opacity: styles.opacity,
+                background: styles.backgroundColor,
+                color: styles.color,
+                width: styles.width,
+                height: styles.height
+            });
+        }
 
         // Click handler for stars
         stars.forEach((star, index) => {
