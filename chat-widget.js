@@ -1129,7 +1129,7 @@
             }
 
             .n8n-feedback-btn-primary {
-                background: var(--chat--color-primary);
+                background: var(--chat--color-primary, #7c3aed);
                 color: white;
             }
 
@@ -1139,7 +1139,7 @@
             }
 
             .n8n-feedback-btn-primary:disabled {
-                background: var(--chat--color-primary);
+                background: var(--chat--color-primary, #7c3aed);
                 opacity: 0.7;
                 cursor: not-allowed;
                 color: white;
@@ -1304,7 +1304,7 @@
 
         // Create fresh overlay
         const overlay = document.createElement('div');
-        overlay.className = 'n8n-feedback-overlay';
+        overlay.className = 'n8n-feedback-overlay n8n-chat-widget';
 
         const showSkip = config.feedbackSettings.show_skip_button !== false; // default true
 
