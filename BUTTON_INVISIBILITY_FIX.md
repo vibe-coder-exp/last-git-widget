@@ -36,6 +36,20 @@ background: var(--chat--color-primary, #7c3aed);
     *   The "Submit" button should now be visible.
     *   It should match your bot's primary color.
     *   If the variable fails, it will be purple (which is visible).
-4.  **Check Debug Logs**: Use the browser console logs we added earlier if visibility issues persist.
+4.  **Check Debug Logs**: Debug logging has been removed for production. If you need to troubleshoot visibility again, you can temporarily add this code inside `showFeedbackModal`:
+
+    ```javascript
+    const submitBtn = overlay.querySelector('.n8n-feedback-submit');
+    if (submitBtn) {
+        const styles = window.getComputedStyle(submitBtn);
+        console.log('Submit Button Styles:', {
+            display: styles.display,
+            visibility: styles.visibility,
+            opacity: styles.opacity,
+            background: styles.backgroundColor,
+            width: styles.width
+        });
+    }
+    ```
 
 This guarantees the button will never be invisible again.

@@ -1343,28 +1343,6 @@
         const commentSection = overlay.querySelector('.n8n-feedback-comment');
 
 
-        console.log('Feedback Modal Debug:', {
-            submitBtn: submitBtn,
-            submitBtnExists: !!submitBtn,
-            stars: stars.length,
-            showSkip,
-            buttonsHTML: overlay.querySelector('.n8n-feedback-actions').innerHTML
-        });
-
-        // Debug button visibility
-        if (submitBtn) {
-            const styles = window.getComputedStyle(submitBtn);
-            console.log('Submit Button Styles:', {
-                display: styles.display,
-                visibility: styles.visibility,
-                opacity: styles.opacity,
-                background: styles.backgroundColor,
-                color: styles.color,
-                width: styles.width,
-                height: styles.height
-            });
-        }
-
         // Click handler for stars
         stars.forEach((star, index) => {
             star.addEventListener('click', () => {
