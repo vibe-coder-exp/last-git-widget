@@ -252,12 +252,29 @@
         }
     }
 
-    // Initialize Supabase Client
-    function initSupabase() {
+    // Initialize Supabase Client with retry logic
+    async function initSupabase(retryCount = 0, maxRetries = 5) {
+        const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+
         if (window.supabase) {
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log('✅ Supabase client initialized successfully');
+                return true;
+            } catch (error) {
+                console.error('❌ Error creating Supabase client:', error);
+                return false;
+            }
         } else {
-            console.error('❌ Supabase JS client not found. Realtime features disabled.');
+            if (retryCount < maxRetries) {
+                console.warn(`⏳ Supabase library not loaded yet. Retrying in ${retryDelay}ms... (Attempt ${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                return initSupabase(retryCount + 1, maxRetries);
+            } else {
+                console.error('❌ Supabase JS client not found after multiple retries. Database features (message history, feedback) will be disabled.');
+                console.error('💡 Make sure the Supabase CDN script is loaded: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
+                return false;
+            }
         }
     }
 
@@ -303,20 +320,32 @@
 
     // Helper: Save message to DB
     async function saveMessageToDB(content, senderType, metadata = {}) {
-        if (!supabaseClient) return;
+        if (!supabaseClient) {
+            console.warn('⚠️ Cannot save message to database: Supabase client not initialized');
+            return;
+        }
 
         try {
+            const messageData = {
+                session_id: currentSessionId,
+                bot_id: getBotId(),
+                content: content,
+                sender_type: senderType,
+                metadata: metadata
+            };
+
+            console.log('📝 Saving message to database:', { senderType, contentLength: content.length });
+
             const { error } = await supabaseClient
                 .from('chat_messages')
-                .insert({
-                    session_id: currentSessionId,
-                    bot_id: getBotId(),
-                    content: content,
-                    sender_type: senderType,
-                    metadata: metadata
-                });
+                .insert(messageData);
 
-            if (error) console.error('❌ Error saving message to DB:', error);
+            if (error) {
+                console.error('❌ Error saving message to DB:', error);
+                console.error('📊 Failed message data:', messageData);
+            } else {
+                console.log('✅ Message saved successfully to database');
+            }
         } catch (err) {
             console.error('❌ DB Save Exception:', err);
         }
@@ -1424,28 +1453,36 @@
             const botId = getBotId();
             const leadId = localStorage.getItem(`n8n_chat_lead_id_${botId}`);
 
-            if (supabaseClient) {
-                const { error } = await supabaseClient
-                    .from('feedback')
-                    .insert({
-                        bot_id: botId,
-                        session_id: currentSessionId || 'unknown',
-                        lead_id: leadId || null,
-                        rating: rating,
-                        comment: comment || null
-                    });
+            if (!supabaseClient) {
+                console.warn('⚠️ Cannot save feedback: Supabase client not initialized');
+                return;
+            }
 
-                if (error) {
-                    console.error('Error saving feedback:', error);
-                    return;
-                }
+            const feedbackData = {
+                bot_id: botId,
+                session_id: currentSessionId || 'unknown',
+                lead_id: leadId || null,
+                rating: rating,
+                comment: comment || null
+            };
+
+            console.log('⭐ Submitting feedback to database:', { rating, hasComment: !!comment });
+
+            const { error } = await supabaseClient
+                .from('feedback')
+                .insert(feedbackData);
+
+            if (error) {
+                console.error('❌ Error saving feedback:', error);
+                console.error('📊 Failed feedback data:', feedbackData);
+                return;
             }
 
             // Update last feedback time
             localStorage.setItem(`n8n_feedback_last_${botId}`, Date.now().toString());
             console.log('✅ Feedback submitted successfully');
         } catch (error) {
-            console.error('Error submitting feedback:', error);
+            console.error('❌ Error submitting feedback:', error);
         }
     }
 
@@ -1943,12 +1980,14 @@
 
     // Initialize on DOM ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            initSupabase(); // Init client first
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initSupabase(); // Init client first and wait for it
             initializeWidget();
         });
     } else {
-        initSupabase();
-        initializeWidget();
+        (async () => {
+            await initSupabase();
+            initializeWidget();
+        })();
     }
 })();
