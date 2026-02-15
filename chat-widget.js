@@ -20,6 +20,38 @@
     const SUPABASE_URL = 'https://uwuizytnrmjkwscagapj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3dWl6eXRucm1qa3dzY2FnYXBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNzg5OTksImV4cCI6MjA4MDc1NDk5OX0.siCpeFl3GGnXcrTfjmC10mjO0pNoj9L7e9zn4lCSCPY';
 
+    // ============================================
+    // DEBUG MODE CONFIGURATION
+    // ============================================
+    // Auto-detect development vs production
+    // Shows verbose logs in development, silent in production
+    const DEBUG_MODE = (function () {
+        // Check for URL parameter override: ?debug=true
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('debug') === 'true') return true;
+        if (urlParams.get('debug') === 'false') return false;
+
+        // Auto-detect: localhost or local IPs = development mode
+        const hostname = window.location.hostname;
+        return hostname === 'localhost' ||
+            hostname === '127.0.0.1' ||
+            hostname.startsWith('192.168.') ||
+            hostname.startsWith('10.') ||
+            hostname.endsWith('.local');
+    })();
+
+    // Logging utility - logs only in debug mode
+    const debugLog = DEBUG_MODE ? console.log.bind(console) : () => { };
+    const debugWarn = DEBUG_MODE ? console.warn.bind(console) : () => { };
+    // Always log errors
+    const debugError = console.error.bind(console);
+
+    // Log current mode on initialization
+    if (DEBUG_MODE) {
+        console.log('%c🔧 DEBUG MODE ENABLED', 'background: #4CAF50; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;');
+        console.log('💡 To disable: add ?debug=false to URL or deploy to production domain');
+    }
+
     // Prevent multiple initializations
     if (window.N8NChatWidgetInitialized) return;
     window.N8NChatWidgetInitialized = true;
@@ -172,14 +204,29 @@
                 rememberConversation: dbConfig.remember_conversation !== false
             },
             customCss: dbConfig.custom_css,
-            leadCollection: dbConfig.lead_collection || { enabled: false, title: 'Contact Info', fields: [] },
             feedbackSettings: dbConfig.feedback_settings || { enabled: true, title: 'Rate your experience', frequency_hours: 24, show_skip_button: true }
         };
     }
 
-    // UUID generation
+    // Generate or retrieve persistent User ID
+    function getUserId() {
+        let userId = localStorage.getItem('n8n_chat_user_id');
+        if (!userId) {
+            userId = crypto.randomUUID();
+            localStorage.setItem('n8n_chat_user_id', userId);
+        }
+        return userId;
+    }
+
+    // Helper: Generate UUID (fallback if crypto.randomUUID not available in older browsers)
     function generateUUID() {
-        return crypto.randomUUID();
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
 
     // Helper: Escape HTML to prevent XSS
@@ -190,17 +237,63 @@
         return div.innerHTML;
     }
 
-    // Helper: Format message (Links & Newlines)
+    // Helper: Format message (Images, Links & Newlines)
     function formatMessage(text) {
-        // 1. Escape HTML first
-        let safeText = escapeHtml(text);
+        // 1. Placeholder storage
+        const placeholders = [];
+        const generatePlaceholder = () => `__IMG_PLACEHOLDER_${placeholders.length}__`;
 
-        // 2. Convert URLs to links
+        // 2. Extract Markdown Images ![alt](url) BEFORE escaping HTML
+        // This prevents URL params like &q=... from becoming &amp;q=... and breaking the match
+        let safeText = text.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, url) => {
+            // We must escape the components individually to prevent XSS
+            const safeUrl = escapeHtml(url).replace(/"/g, '&quot;');
+            const safeAlt = escapeHtml(alt).replace(/"/g, '&quot;');
+
+            const replacement = `<img src="${safeUrl}" alt="${safeAlt}" class="chat-image" onclick="window.open('${safeUrl}', '_blank')" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', '<a href=\\'${safeUrl}\\' target=\\'_blank\\' class=\\'chat-link\\'>Image</a>')">`;
+
+            const ph = generatePlaceholder();
+            placeholders.push(replacement);
+            return ph;
+        });
+
+        // 3. Extract Markdown Links [text](url) BEFORE escaping HTML
+        safeText = safeText.replace(/\[(.*?)\]\((.*?)\)/g, (match, text, url) => {
+            const safeUrl = escapeHtml(url).replace(/"/g, '&quot;');
+            const safeTextContent = escapeHtml(text);
+
+            // Standard blue link
+            const replacement = `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="chat-link" style="color: #2196f3; text-decoration: underline;">${safeTextContent}</a>`;
+
+            const ph = generatePlaceholder();
+            placeholders.push(replacement);
+            return ph;
+        });
+
+        // 4. Escape the remaining HTML logic
+        safeText = escapeHtml(safeText);
+
+        // 4. Process remaining URLs (Auto-detect extensions OR create Links)
+        // We catch ALL URLs here in one pass
         safeText = safeText.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+            // Check if it's an image extension
+            if (url.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/i)) {
+                const replacement = `<img src="${url}" alt="Image" class="chat-image" onclick="window.open('${url}', '_blank')">`;
+
+                const ph = generatePlaceholder();
+                placeholders.push(replacement);
+                return ph;
+            }
+            // Otherwise, it's a regular link
             return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`;
         });
 
-        // 3. Convert newlines
+        // 5. Restore Placeholders
+        placeholders.forEach((html, index) => {
+            safeText = safeText.split(`__IMG_PLACEHOLDER_${index}__`).join(html);
+        });
+
+        // 6. Convert newlines
         safeText = safeText.replace(/\n/g, '<br>');
 
         return safeText;
@@ -259,20 +352,20 @@
         if (window.supabase) {
             try {
                 supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log('✅ Supabase client initialized successfully');
+                debugLog('✅ Supabase client initialized successfully');
                 return true;
             } catch (error) {
-                console.error('❌ Error creating Supabase client:', error);
+                debugError('❌ Error creating Supabase client:', error);
                 return false;
             }
         } else {
             if (retryCount < maxRetries) {
-                console.warn(`⏳ Supabase library not loaded yet. Retrying in ${retryDelay}ms... (Attempt ${retryCount + 1}/${maxRetries})`);
+                debugWarn(`⏳ Supabase library not loaded yet. Retrying in ${retryDelay}ms... (Attempt ${retryCount + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 return initSupabase(retryCount + 1, maxRetries);
             } else {
-                console.error('❌ Supabase JS client not found after multiple retries. Database features (message history, feedback) will be disabled.');
-                console.error('💡 Make sure the Supabase CDN script is loaded: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
+                debugError('❌ Supabase JS client not found after multiple retries. Database features (message history, feedback) will be disabled.');
+                debugError('💡 Make sure the Supabase CDN script is loaded: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
                 return false;
             }
         }
@@ -321,33 +414,36 @@
     // Helper: Save message to DB
     async function saveMessageToDB(content, senderType, metadata = {}) {
         if (!supabaseClient) {
-            console.warn('⚠️ Cannot save message to database: Supabase client not initialized');
+            debugWarn('⚠️ Cannot save message to database: Supabase client not initialized');
             return;
         }
 
         try {
+            // Ensure userId is in metadata
+            const finalMetadata = { ...metadata, userId: getUserId() };
+
             const messageData = {
                 session_id: currentSessionId,
                 bot_id: getBotId(),
                 content: content,
                 sender_type: senderType,
-                metadata: metadata
+                metadata: finalMetadata
             };
 
-            console.log('📝 Saving message to database:', { senderType, contentLength: content.length });
+            debugLog('📝 Saving message to database:', { senderType, contentLength: content.length });
 
             const { error } = await supabaseClient
                 .from('chat_messages')
                 .insert(messageData);
 
             if (error) {
-                console.error('❌ Error saving message to DB:', error);
-                console.error('📊 Failed message data:', messageData);
+                debugError('❌ Error saving message to DB:', error);
+                debugError('📊 Failed message data:', messageData);
             } else {
-                console.log('✅ Message saved successfully to database');
+                debugLog('✅ Message saved successfully to database');
             }
         } catch (err) {
-            console.error('❌ DB Save Exception:', err);
+            debugError('❌ DB Save Exception:', err);
         }
     }
 
@@ -700,6 +796,21 @@
             .n8n-chat-widget .chat-message.user a.chat-link {
                 color: inherit;
                 opacity: 0.95;
+            }
+
+            .n8n-chat-widget .chat-image {
+                display: block;
+                max-width: 100%;
+                border-radius: 8px;
+                margin-top: 8px;
+                margin-bottom: 2px;
+                cursor: pointer;
+                transition: opacity 0.2s;
+                border: 1px solid rgba(0,0,0,0.05);
+            }
+            
+            .n8n-chat-widget .chat-image:hover {
+                opacity: 0.9;
             }
 
             .n8n-chat-widget .typing-indicator {
@@ -1454,7 +1565,7 @@
             const leadId = localStorage.getItem(`n8n_chat_lead_id_${botId}`);
 
             if (!supabaseClient) {
-                console.warn('⚠️ Cannot save feedback: Supabase client not initialized');
+                debugWarn('⚠️ Cannot save feedback: Supabase client not initialized');
                 return;
             }
 
@@ -1466,23 +1577,23 @@
                 comment: comment || null
             };
 
-            console.log('⭐ Submitting feedback to database:', { rating, hasComment: !!comment });
+            debugLog('⭐ Submitting feedback to database:', { rating, hasComment: !!comment });
 
             const { error } = await supabaseClient
                 .from('feedback')
                 .insert(feedbackData);
 
             if (error) {
-                console.error('❌ Error saving feedback:', error);
-                console.error('📊 Failed feedback data:', feedbackData);
+                debugError('❌ Error saving feedback:', error);
+                debugError('📊 Failed feedback data:', feedbackData);
                 return;
             }
 
             // Update last feedback time
             localStorage.setItem(`n8n_feedback_last_${botId}`, Date.now().toString());
-            console.log('✅ Feedback submitted successfully');
+            debugLog('✅ Feedback submitted successfully');
         } catch (error) {
-            console.error('❌ Error submitting feedback:', error);
+            debugError('❌ Error submitting feedback:', error);
         }
     }
 
@@ -1694,6 +1805,9 @@
 
             // 1. Save to Supabase
             if (supabaseClient) {
+                // Add userId to metadata
+                const finalMetadata = { ...data, userId: getUserId() };
+
                 const { error } = await supabaseClient
                     .from('leads')
                     .insert({
@@ -1703,7 +1817,7 @@
                         name: data.name,
                         email: data.email,
                         phone: data.phone,
-                        metadata: data
+                        metadata: finalMetadata
                     });
 
                 if (error) throw error;
@@ -1913,7 +2027,9 @@
             botId: getBotId(),
             route: config.webhook.route,
             chatInput: message,
-            metadata: { userId: "" }
+            metadata: {
+                userId: getUserId()
+            }
         };
 
         // Add user message
