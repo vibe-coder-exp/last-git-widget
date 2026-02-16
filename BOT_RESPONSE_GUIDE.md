@@ -64,8 +64,10 @@ Go to https://google.com
 | **Image** | `![Image Name](https://url...)` |
 | **Link with Text** | `[Click Here](https://url...)` |
 | **Plain URL** | `https://url...` |
-| **Bold Text** | `This is **bold**` |
-| **Italic Text** | `This is *italic*` |
+| **Bold Text** | `**This is bold**` |
+| **Italic Text** | `*This is italic*` |
+| **Code** | `` `code` `` |
+| **List Item** | `- Item 1` (on a new line) |
 
 ---
 

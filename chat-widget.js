@@ -273,7 +273,21 @@
         // 4. Escape the remaining HTML logic
         safeText = escapeHtml(safeText);
 
-        // 4. Process remaining URLs (Auto-detect extensions OR create Links)
+        // 5. Parse Markdown Text Styles (Bold, Italic, Monospace)
+        // Bold: **text**
+        safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // Italic: *text*
+        safeText = safeText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        // Monospace: `text`
+        safeText = safeText.replace(/`(.*?)`/g, '<code>$1</code>');
+
+        // Bullet Lists: - item (must be at start of line or after newline)
+        // We replace it with a bullet point char for simplicity
+        safeText = safeText.replace(/(\n|^)-\s+(.+)/g, '$1• $2');
+
+        // 6. Process remaining URLs (Auto-detect extensions OR create Links)
         // We catch ALL URLs here in one pass
         safeText = safeText.replace(/(https?:\/\/[^\s]+)/g, (url) => {
             // Check if it's an image extension
